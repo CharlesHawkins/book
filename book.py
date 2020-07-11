@@ -44,7 +44,7 @@ global text
 
 if args.p:
 	if not paste:
-		stderr.write('Input from clipboard requires the pyperclip module\n')
+		sys.stderr.write('Input from clipboard requires the pyperclip module\n')
 		exit(1)
 	text = pyperclip.paste()
 	save = False
@@ -59,7 +59,7 @@ else:
 		save = True
 		text = infile.read()
 	except IOError as e:
-		stderr.write('Error: Could not open input file %s: %s\n'%(args.i, e.strerror))
+		sys.stderr.write('Error: Could not open input file %s: %s\n'%(args.i, e.strerror))
 		exit(1)
 
 
@@ -142,7 +142,6 @@ def main(screen):
 			page = find_page_with_word(word_n, index)
 			page = (page//cols)*cols
 		except Exception as e:
-			#sys.stderr.write('%s: %s'%(savename, str(e)))
 			pass
 	word = index[page-1] if page > 0 else 0
 	while True:
@@ -220,7 +219,7 @@ def main(screen):
 						status_text = 'Pasted (replacing)'
 						page = 0
 					else:
-						text = text + '\n' + pasted
+						text = text + ('\n\n' if args.m else '\n') + pasted
 						status_text = 'Pasted (appending)'
 					(pages, index) = ready_text(text, page_width, page_height)
 		elif k == curses.KEY_RESIZE:
@@ -232,8 +231,6 @@ def main(screen):
 			t = "%s, %s (%s)"%(y, x, curses.is_term_resized(y,x))
 			(y, x) = screen.getmaxyx()
 			status_text = "%s -> %s, %s (%s)"%(t, y, x, curses.is_term_resized(y,x))
-			sys.stderr.write('Reiszed\n')
-			#curses.resizeterm(y, x)
 
 		elif args.v:
 			status_text = str(k)
