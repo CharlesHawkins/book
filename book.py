@@ -228,9 +228,9 @@ def main(screen):
 			(pages, index) = ready_text(text, page_width, page_height)
 			page = find_page_with_word(word, index)
 			page = (page//cols)*cols
-			t = "%s, %s (%s)"%(y, x, curses.is_term_resized(y,x))
+			#t = "%s, %s (%s)"%(y, x, curses.is_term_resized(y,x))
 			(y, x) = screen.getmaxyx()
-			status_text = "%s -> %s, %s (%s)"%(t, y, x, curses.is_term_resized(y,x))
+			#status_text = "%s -> %s, %s (%s)"%(t, y, x, curses.is_term_resized(y,x))
 
 		elif args.v:
 			status_text = str(k)
