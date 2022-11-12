@@ -10,6 +10,7 @@ Several options are available:
 * -m or --merge-lines will remove single newlines, but keep sequences of two or more newlines. This is useful for ebooks that have newlines already "baked in" for each line, as is the case with Gutenberg's plain-text ebooks.
 * -c or --cols is used to set the number of columns. The default is 2.
 * -p or --clipboard is used to read text from the system clipboard instead of a file. This requires the [pyperclip](https://pypi.org/project/pyperclip/)  Python module.
+* -u or --mouse enables setting your place by clicking the mouse. See below for how this works. 
 
 #### Usage and keys
 * You can page forward and backward with the arrows (up/down and left-right both work), or with the vim keys h, j, k, and l (h and k go back a page, j and l go forward).
@@ -18,3 +19,6 @@ Several options are available:
 * Press q to quit Book. Currently it does not ask you if you want to save your place.
 * Press shift-p to paste text from the clipboard, appending to the end of the current document. This only works if you were reading from the clipboard in the first place with -p. If you instead press ctrl-p, the clipboard contents replace the current text rather than being appended to the end. Pasting form the clipboard requires the [pyperclip](https://pypi.org/project/pyperclip/) Python module.
 * Press + and - to increase or decrease the number of columns
+* When mouse mode is enabled, click a line to set the first word on that line as your current reading place; turning pages with the keyboard will reset the reading place to the upper-leftmost word on the screen. The reading place has the following effects: 
+	* The save command (Shift-S) will save to your current reading place
+	* When resizing the terminal window or changing the number of columns your reading place will be kept on screen

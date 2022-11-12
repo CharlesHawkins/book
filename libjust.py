@@ -1,9 +1,14 @@
+import re
+from sys import stderr
+
 esc = '\x1b'	# The escape character
 csi = esc + '['	# Control Sequence Introducer, used for terminal control sequences
 def sgr(n):	# Return a string that when printed will send a Select Graphic Rendition command to the terminal. n should be an integer indicating the display mode to select
 	return(csi + str(n) + 'm')
 def with_sgr(n, string):	# Return a string containing the given string with graphic rendition code n, and a code that resets the terminal after
 	return(sgr(n)+string+sgr(0))
+
+re_word_break = re.compile('[ \t]+|(?<=\n)')
 
 def justify_line(words, words_width, line_width):
 	if not words:
@@ -36,26 +41,26 @@ def split_words_into_pages(words, width, lines, min_width):
 	pages = []
 	word_index = []
 	while word_n < len(words):
-		page = justify_words(words, width, word_n, min_width, lines)
-		pages.append(page[0])
-		word_n = page[2]
+		page, _, word_n = justify_words(words, width, word_n, min_width, lines)
+		pages.append(page)
 		word_index.append(word_n)
 	return (pages, word_index)
 
 	
 def split_text_into_words(text):
 # This function splits a string of text into words. It will return an array of strings that each contain one word
-	words = text.split(' ')
-	i = 0
-	while i < len(words):
-		try:
-			lineb = words[i].index('\n')
-			words.insert(i+1, words[i][lineb+1:])
-			words[i] = words[i][:lineb+1]
-		except ValueError:
-			pass
-		i += 1
-	return words
+	return re_word_break.split(text)
+#	words = text.split(' ')
+#	i = 0
+#	while i < len(words):
+#		try:
+#			lineb = words[i].index('\n')
+#			words.insert(i+1, words[i][lineb+1:])
+#			words[i] = words[i][:lineb+1]
+#		except ValueError:
+#			pass
+#		i += 1
+#	return words
 
 
 
