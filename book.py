@@ -20,6 +20,20 @@ try:
 except ImportError:
 	pass
 
+epub = True
+ebl = True
+try:
+	import ebooklib
+	from ebooklib import epub
+except ImportError:
+	epub = False
+	ebl = False
+try:
+	import bs4
+except ImportError:
+	epub = False
+	bs = False
+
 # Key constants
 uparrows = [curses.KEY_UP, ord('k')]
 downarrows = [curses.KEY_DOWN, ord('j')]
@@ -34,10 +48,12 @@ esc_char = chr(esc)
 
 par = ap.ArgumentParser(description = 'Terminal ebook reader')
 par.add_argument('i', nargs='?', help = 'File to read from')
+par.add_argument('-e', '--epub', action = 'store_true', help = 'Read the specified file as an epub book', dest = 'e')
 par.add_argument('-m', '--merge-lines', action = 'store_true', help = 'Merge lines separated by only a single newline', dest = 'm')
 par.add_argument('-c', '--cols', type=int, default=2, help = 'Number of columns to display', dest = 'c')
 par.add_argument('-p', '--clipboard', action = 'store_true', help = 'Get input from clipboard instead of file', dest = 'p')
 par.add_argument('-u', '--mouse', action = 'store_true', help = 'Enable mouse support', dest = 'u')
+par.add_argument('-n', '--no-warn', action = 'store_true', help = 'Do not warn before quitting if the current read position is unsaved', dest = 'n')
 par.add_argument('-v', '--verbose', action = 'store_true', help = 'Print extra info to the status line', dest = 'v')
 
 args = par.parse_args()
@@ -59,10 +75,22 @@ elif args.i is None or args.i == '-':
 else:
 	try:
 		infilename = path.abspath(args.i)
-		infile = open(args.i, 'r')
 		savename = '%s/.%s.cbookmark'%(path.dirname(infilename),path.basename(infilename))
 		save = True
-		text = infile.read()
+		if args.e:
+			if not epub:
+				if not ebl:
+					sys.stderr.write('Reading epub requires the ebooklib python module (https://pypi.org/project/EbookLib/)\n')
+				if not bs:
+					sys.stderr.write('Reading epub requires the BeautifulSoup4 python module (https://pypi.org/project/beautifulsoup4/)\n')
+				exit(1)
+			infile = epub.read_epub(args.i, options={'ignore_ncx':True})
+			text = ''
+			for item in infile.get_items_of_type(ebooklib.ITEM_DOCUMENT):
+				text += bs4.BeautifulSoup(item.get_body_content(), features='lxml').text.rstrip() + '\n\n'
+		else:
+			infile = open(args.i, 'r')
+			text = infile.read()
 	except IOError as e:
 		sys.stderr.write('Error: Could not open input file %s: %s\n'%(args.i, e.strerror))
 		exit(1)
@@ -201,15 +229,21 @@ def main(screen):
 	page = 0
 	(pages, index) = ready_text(text, page_width, page_height)
 	status_text = None
+	def save_bookmark(word):
+		bkmkfile = open(savename, 'w')
+		bkmkfile.write(str(word))
+		saved_word = word
+		bkmkfile.close()
+
 	if save:
 		try:
 			bkmkfile = open(savename, 'r')
-			word_n = int(bkmkfile.read())
-			page = find_page_with_word(word_n, index)
+			word = int(bkmkfile.read())
+			page = find_page_with_word(word, index)
 			page = (page//cols)*cols
 		except Exception as e:
-			pass
-	word = index[page-1] if page > 0 else 0
+			word = index[page-1] if page > 0 else 0
+	saved_word = word
 	if args.u:
 		curses.mousemask(curses.ALL_MOUSE_EVENTS)
 
@@ -255,7 +289,24 @@ def main(screen):
 			except curses.error:
 				continue
 		if k == ord('q'):
-			exit()
+			if (not args.n) and save and (saved_word != word):
+				status_text=('Save new read position before quitting? (Y/N)')
+				status(status_text, status_win)
+				while True:
+					k = screen.getch()
+					if k == ord('y') or k == ord('Y'):
+						try:
+							save_bookmark(word)
+							exit(0)
+						except IOError as e:
+							status_text = '%s: %s'%(savename, e.strerror)
+					elif k == ord('n') or k == ord('N'):
+						exit(0)
+					else:
+						status_text = 'Quit cancelled'
+						break
+			else:
+				exit(0)
 		elif k in nextpage:
 			if page+cols < len(pages):
 				page += cols
@@ -283,15 +334,10 @@ def main(screen):
 		elif k == ord('S'):
 			if save:
 				try:
-					bkmkfile = open(savename, 'w')
-					if page == 0:
-						bkmkfile.write('0')
-					else:
-						bkmkfile.write(str(word))
+					save_bookmark(word)
 					status_text = 'Saved'
 					if args.v:
 						status_text += f' (word #{word})'
-					bkmkfile.close()
 				except IOError as e:
 					status_text = '%s: %s'%(savename, e.strerror)
 			else:
