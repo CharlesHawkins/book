@@ -68,7 +68,7 @@ if args.p:
 	if not paste:
 		sys.stderr.write('Input from clipboard requires the pyperclip module\n')
 		exit(1)
-	text = pyperclip.paste().strip()
+	text = pyperclip.paste().lstrip(' \r\n').strip()
 	save = False
 elif args.i is None or args.i == '-':
 	infile = sys.stdin
@@ -356,7 +356,7 @@ def main(screen):
 			elif save:
 				status_text = 'Input was from a file, cannot paste'
 			else:
-				pasted = pyperclip.paste().strip()
+				pasted = pyperclip.paste().lstrip(' \r\n').rstrip()
 				if not pasted:
 					status_text = 'No text on clipboard'
 				else:
@@ -365,7 +365,7 @@ def main(screen):
 						status_text = 'Pasted (replacing)'
 						page = 0
 					else:
-						text = text.rstrip() + ('\n\n' if args.m else '\n') + pasted
+						text = text.lstrip(' \r\n').rstrip() + ('\n\n' if args.m else '\n') + pasted
 						status_text = 'Pasted (appending)'
 					(pages, index) = ready_text(text, page_width, page_height)
 		elif k == curses.KEY_RESIZE:
