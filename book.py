@@ -22,6 +22,7 @@ except ImportError:
 
 epub = True
 ebl = True
+bs = True
 try:
 	import ebooklib
 	from ebooklib import epub
@@ -67,7 +68,7 @@ if args.p:
 	if not paste:
 		sys.stderr.write('Input from clipboard requires the pyperclip module\n')
 		exit(1)
-	text = pyperclip.paste()
+	text = pyperclip.paste().strip()
 	save = False
 elif args.i is None or args.i == '-':
 	infile = sys.stdin
@@ -243,7 +244,9 @@ def main(screen):
 			page = (page//cols)*cols
 		except Exception as e:
 			word = index[page-1] if page > 0 else 0
-	saved_word = word
+		saved_word = word
+	else:
+		word = 0
 	if args.u:
 		curses.mousemask(curses.ALL_MOUSE_EVENTS)
 
@@ -353,7 +356,7 @@ def main(screen):
 			elif save:
 				status_text = 'Input was from a file, cannot paste'
 			else:
-				pasted = pyperclip.paste()
+				pasted = pyperclip.paste().strip()
 				if not pasted:
 					status_text = 'No text on clipboard'
 				else:
@@ -362,7 +365,7 @@ def main(screen):
 						status_text = 'Pasted (replacing)'
 						page = 0
 					else:
-						text = text + ('\n\n' if args.m else '\n') + pasted
+						text = text.rstrip() + ('\n\n' if args.m else '\n') + pasted
 						status_text = 'Pasted (appending)'
 					(pages, index) = ready_text(text, page_width, page_height)
 		elif k == curses.KEY_RESIZE:
