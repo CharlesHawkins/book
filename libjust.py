@@ -3,7 +3,7 @@ from sys import stderr
 from math import ceil
 
 indent_in = 4
-indent_out = 2
+indent_out = 3
 
 esc = '\x1b'	# The escape character
 csi = esc + '['	# Control Sequence Introducer, used for terminal control sequences
@@ -94,6 +94,9 @@ def justify_words(words, width, start_word = 0, min_width = 1, max_lines = None,
 	n_lines = 0
 	new_para = True
 	i = start_word
+	indent = start_indent
+	width_with_indent = width-indent
+	indent_spaces = ' '*indent
 	words[i] = ' '*(start_indent*indent_in//indent_out)+words[i]  # If we have a starting indent from the previous call, we add 'fake' indent spaces to the first word, which will then be caught by the new_para code
 	while i < len(words):
 		word = words[i]

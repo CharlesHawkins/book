@@ -4,6 +4,7 @@ import curses
 import argparse as ap
 import re
 import sys
+import os
 from os import path
 
 from libjust import *
@@ -72,7 +73,14 @@ if args.p:
 	save = False
 elif args.i is None or args.i == '-':
 	infile = sys.stdin
+	text = infile.read()
 	save = False
+	try:
+		newstdin = open('/dev/tty', 'r')
+		os.dup2(newstdin.fileno(), 0)
+	except IOError as e:
+		stdout.write('Error opening /dev/tty: %s. Reading from standard input may not work on this system.'%e.strerror)
+		exit(1)
 else:
 	try:
 		infilename = path.abspath(args.i)
