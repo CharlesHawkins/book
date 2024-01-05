@@ -268,7 +268,11 @@ def main(screen):
 				if not curses.is_term_resized(y, x):
 					page_wins[i].addstr(0,0,pages[page+i])
 					if not status_text:
-						page_n_wins[i].addstr(0,0,str(page+i+1))
+						page_n_str = str(page+i+1)
+						try:
+							page_n_wins[i].addstr(0,0,page_n_str)
+						except curses.error:
+							pass
 					page_wins[i].refresh()
 					page_n_wins[i].refresh()
 				#highlight_word(1, pages[page+i], page_wins[i])

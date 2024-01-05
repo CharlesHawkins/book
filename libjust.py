@@ -95,8 +95,9 @@ def justify_words(words, width, start_word = 0, min_width = 1, max_lines = None,
 	new_para = True
 	i = start_word
 	indent = start_indent
-	width_with_indent = width-indent
-	indent_spaces = ' '*indent
+	eff_indent = min(indent, width-3)
+	width_with_indent = width-eff_indent
+	indent_spaces = ' '*eff_indent
 	words[i] = ' '*(start_indent*indent_in//indent_out)+words[i]  # If we have a starting indent from the previous call, we add 'fake' indent spaces to the first word, which will then be caught by the new_para code
 	while i < len(words):
 		word = words[i]
@@ -107,8 +108,9 @@ def justify_words(words, width, start_word = 0, min_width = 1, max_lines = None,
 			words[i], indent = get_word_and_indent(words[i])
 			if words[i]:
 				word = words[i]
-			width_with_indent = width-indent
-			indent_spaces = ' '*indent
+			eff_indent = min(indent, width-3)
+			width_with_indent = width-eff_indent
+			indent_spaces = ' '*eff_indent
 			new_para = False
 		new_total_width = total_width + len(word)+1
 		if new_total_width <= width_with_indent:	# Adding this word to the line won't put it over the column width, so just add it
@@ -124,13 +126,14 @@ def justify_words(words, width, start_word = 0, min_width = 1, max_lines = None,
 				new_para = True
 		else:	# Adding this word would put it over the column width; start a new line 
 			n_lines += 1
-			if max_lines and n_lines > max_lines-1:
+			if max_lines and n_lines > max_lines-1:  # We've filled up the page, return the completed page
 				jl = indent_spaces+justify_line(this_line, total_width-len(this_line), width_with_indent)
 				out_text += jl
 				return (out_text, n_lines, i, indent)
 			if(total_width < (min_width or 1)):	# We need to break this word up with a hyphen
-				firsthalf = word[:width_with_indent-2-total_width]
-				rest = word[width_with_indent-2-total_width:]
+				break_pt = width_with_indent-2-total_width
+				firsthalf = word[:break_pt]
+				rest = word[break_pt:]
 				this_line += [firsthalf+'-']
 				total_width = width_with_indent
 				#words.insert(i+1, rest)
@@ -142,4 +145,4 @@ def justify_words(words, width, start_word = 0, min_width = 1, max_lines = None,
 			this_line = []
 		i+=1
 	out_text += indent_spaces+justify_line(this_line, total_width-len(this_line), width_with_indent)
-	return (out_text, n_lines, i, indent)
+	return (out_text, n_lines, i, indent)  # We've reached the end of the input text, return the completed page
