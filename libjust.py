@@ -12,8 +12,8 @@ def sgr(n):	# Return a string that when printed will send a Select Graphic Rendi
 def with_sgr(n, string):	# Return a string containing the given string with graphic rendition code n, and a code that resets the terminal after
 	return(sgr(n)+string+sgr(0))
 
-re_word_break = re.compile('(?<=\S)[ \t]+|(?<=\n)')
-re_nospace = re.compile('\S')
+re_word_break = re.compile('(?<=\\S)[ \t]+|(?<=\n)')
+re_nospace = re.compile('\\S')
 
 def justify_line(words, words_width, line_width):
 	if not words:
@@ -98,7 +98,9 @@ def justify_words(words, width, start_word = 0, min_width = 1, max_lines = None,
 	eff_indent = min(indent, width-3)
 	width_with_indent = width-eff_indent
 	indent_spaces = ' '*eff_indent
-	words[i] = ' '*(start_indent*indent_in//indent_out)+words[i]  # If we have a starting indent from the previous call, we add 'fake' indent spaces to the first word, which will then be caught by the new_para code
+	if i < len(words):
+		words[i] = words[i].lstrip('\r\n')
+		words[i] = ' '*(start_indent*indent_in//indent_out)+words[i]  # If we have a starting indent from the previous call, we add 'fake' indent spaces to the first word, which will then be caught by the new_para code
 	while i < len(words):
 		word = words[i]
 		if not word:	# A 'blank' word indicates multiple consective spaces in the input. Ignore.

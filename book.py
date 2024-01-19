@@ -48,13 +48,17 @@ prevpage = leftarrows + uparrows
 esc = 0x1B
 esc_char = chr(esc)
 
+min_col_width = 7
+min_height = 6
+
 par = ap.ArgumentParser(description = 'Terminal ebook reader')
 par.add_argument('i', nargs='?', help = 'File to read from')
 par.add_argument('-e', '--epub', action = 'store_true', help = 'Read the specified file as an epub book', dest = 'e')
 par.add_argument('-m', '--merge-lines', action = 'store_true', help = 'Merge lines separated by only a single newline', dest = 'm')
 par.add_argument('-c', '--cols', type=int, default=2, help = 'Number of columns to display', dest = 'c')
 par.add_argument('-p', '--clipboard', action = 'store_true', help = 'Get input from clipboard instead of file', dest = 'p')
-par.add_argument('-u', '--mouse', action = 'store_true', help = 'Enable mouse support', dest = 'u')
+par.add_argument('--no-mouse', action = 'store_false', help = 'Disable mouse support', dest = 'u')
+par.add_argument('-u', '--mouse', action = 'store_true', help = 'Enable mouse support (the default)', dest = 'u')
 par.add_argument('-n', '--no-warn', action = 'store_true', help = 'Do not warn before quitting if the current read position is unsaved', dest = 'n')
 par.add_argument('-v', '--verbose', action = 'store_true', help = 'Print extra info to the status line', dest = 'v')
 
@@ -104,12 +108,19 @@ else:
 		sys.stderr.write('Error: Could not open input file %s: %s\n'%(args.i, e.strerror))
 		exit(1)
 
-
+class TooSmallError (ValueError):
+	def __init__(self, cols = None):
+		self.cols = cols
+		super().__init__()
 def create_column_layout(screen, cols, margin, top, bottom):
 	(y, x) = screen.getmaxyx()
 	page_wins = [None]*cols
 	page_n_wins = [None]*cols
 	page_width = (x-margin*(cols+1))//cols
+	if page_width < min_col_width:
+		raise TooSmallError(cols)
+	if y < min_height:
+		raise TooSmallError(0)
 	page_height = y-top-bottom
 	page_n_width = page_width//2
 	status_win = screen.derwin(1, x-2*margin, y-2, margin)
@@ -117,7 +128,12 @@ def create_column_layout(screen, cols, margin, top, bottom):
 		page_wins[i] = screen.derwin(page_height, page_width, top, margin+i*(page_width+margin))
 		page_n_wins[i] = screen.derwin(1, page_n_width, y-2, margin+i*(page_width+margin)+page_n_width)
 	return page_wins, page_n_wins, status_win, page_width-1, page_height-1
-
+def full_screen_msg(screen, msg):
+	try:
+		screen.refresh()
+		screen.addstr(msg)
+	except curses.error:
+		pass
 def display_page(win, pages, page):
 	(y, x) = win.getmaxyx()
 
@@ -126,11 +142,11 @@ def status(str, win):
 	win.addstr(0,0,str[:x-1])
 	win.refresh()
 
-def get_progress_bar(page, pages, win, cols):
+def get_progress_bar(page, pages, win, cols, as_pct):
 	(y, x) = win.getmaxyx()
 	x -= 1
 	pct = page/(pages-(pages%cols))
-	pct_str = str(round(pct*100,2))+'%'
+	pct_str = str(round(pct*100,2))+'%' if as_pct else f'{page+1}/{pages}'
 	x_left = x - len(pct_str)
 	done = int(pct*x_left)
 	left = x_left-done
@@ -180,10 +196,9 @@ def first_word_of_line(line, page_text):
 			word += len(line_words)
 	return word
 
-def is_win_big_enough(y, x, cols, margin, top, bottom):
+def is_win_wide_enough(y, x, cols, margin, top, bottom):
 	page_width = (x-margin*(cols+1))//cols
-	page_height = y-top-bottom
-	return page_width > 7 and page_height > 0
+	return page_width >= min_col_width
 
 def set_mouse_mode(mode):
 	sys.stdout.write(f'{esc_char}[?9{"h" if mode else "l"}')
@@ -234,9 +249,16 @@ def main(screen):
 	screen.refresh()
 	(y, x) = screen.getmaxyx()
 	cols = args.c
-	page_wins, page_n_wins, status_win, page_width, page_height = create_column_layout(screen, cols, margin, top, bottom)
+	too_small_cols = 0
+	status_win = None
+	try:
+		page_wins, page_n_wins, status_win, page_width, page_height = create_column_layout(screen, cols, margin, top, bottom)
+		(pages, index) = ready_text(text, page_width, page_height)
+		too_small = False
+	except TooSmallError as e:
+		too_small = True
+		too_small_cols = e.cols
 	page = 0
-	(pages, index) = ready_text(text, page_width, page_height)
 	status_text = None
 	def save_bookmark(word):
 		bkmkfile = open(savename, 'w')
@@ -263,20 +285,27 @@ def main(screen):
 
 	while True:
 		screen.clear()
-		for i in range(cols):
-			if page+i < len(pages):
-				if not curses.is_term_resized(y, x):
-					page_wins[i].addstr(0,0,pages[page+i])
-					if not status_text:
-						page_n_str = str(page+i+1)
-						try:
-							page_n_wins[i].addstr(0,0,page_n_str)
-						except curses.error:
-							pass
-					page_wins[i].refresh()
-					page_n_wins[i].refresh()
-				#highlight_word(1, pages[page+i], page_wins[i])
-		if status_text:
+		if not too_small:
+			for i in range(cols):
+				if page+i < len(pages):
+						if not curses.is_term_resized(y, x):
+							try:
+								page_wins[i].addstr(0,0,pages[page+i])
+							except curses.error:
+								pass
+							if not status_text:
+								page_n_str = str(page+i+1)
+								try:
+									page_n_wins[i].addstr(0,0,page_n_str)
+								except curses.error:
+									pass
+							page_wins[i].refresh()
+							page_n_wins[i].refresh()
+						#highlight_word(1, pages[page+i], page_wins[i])
+		else:
+			newline = '\n'
+			full_screen_msg(screen, f'Terminal is too small{" for " + str(too_small_cols) + " columns!" + newline + "(- to decrease columns)" if too_small_cols > 1 else "!"}')
+		if status_text and status_win:
 			status(status_text, status_win)
 			status_text = None
 		if hl_line is not None:
@@ -287,6 +316,11 @@ def main(screen):
 			try:
 				mouse_id, mouse_x, mouse_y, mouse_z, state = curses.getmouse()
 				if state & curses.BUTTON1_CLICKED:
+					if mouse_x < x//3:
+						k = ord('k')
+					elif mouse_x > x*2//3:
+						k = ord('j')
+				elif state & curses.BUTTON3_CLICKED:
 					mouse_page_rel, mouse_line = find_clicked_line(mouse_x, mouse_y, top, margin, page_width, len(page_wins), page_wins[0].getmaxyx()[0])
 					mouse_page = page + mouse_page_rel
 					word = (index[mouse_page-1] if mouse_page > 0 else 0) + first_word_of_line(mouse_line, pages[mouse_page])
@@ -301,7 +335,7 @@ def main(screen):
 					k = ord('k')
 				if args.v:
 					status_text = f'Click ({mouse_x}, {mouse_y}, {state})'
-			except curses.error:
+			except (curses.error, IndexError):
 				continue
 		if k == ord('q'):
 			if (not args.n) and save and (saved_word != word):
@@ -331,20 +365,28 @@ def main(screen):
 				page -= cols
 				word = index[page-1] if page > 0 else 0
 		elif k == ord('=') or k == ord('+'):
-			if is_win_big_enough(y, x, cols, margin, top, bottom):
-				cols += 1
-				page_wins, page_n_wins, status_win, page_width, page_height = create_column_layout(screen, cols, margin, top, bottom)
-				(pages, index) = ready_text(text, page_width, page_height)
-				page = find_page_with_word(word, index)
-				page = (page//cols)*cols
+			try:
+				if not too_small:
+					cols += 1
+					page_wins, page_n_wins, status_win, page_width, page_height = create_column_layout(screen, cols, margin, top, bottom)
+					(pages, index) = ready_text(text, page_width, page_height)
+					page = find_page_with_word(word, index)
+					page = (page//cols)*cols
+			except TooSmallError as e:
+				cols -= 1
 			status_text = '%s column%s'%(cols,'' if cols == 1 else 's')
 		elif k == ord('-') or k == ord('_'):
-			if cols > 1:
-				cols -= 1
-				page_wins, page_n_wins, status_win, page_width, page_height = create_column_layout(screen, cols, margin, top, bottom)
-				(pages, index) = ready_text(text, page_width, page_height)
-				page = find_page_with_word(word, index)
-				page = (page//cols)*cols
+			try:
+				if cols > 1:
+					cols -= 1
+					page_wins, page_n_wins, status_win, page_width, page_height = create_column_layout(screen, cols, margin, top, bottom)
+					(pages, index) = ready_text(text, page_width, page_height)
+					page = find_page_with_word(word, index)
+					page = (page//cols)*cols
+					too_small = False
+			except TooSmallError as e:
+				too_small = True
+				too_small_cols = e.cols
 			status_text = '%s column%s'%(cols,'' if cols == 1 else 's')
 		elif k == ord('S'):
 			if save:
@@ -357,8 +399,8 @@ def main(screen):
 					status_text = '%s: %s'%(savename, e.strerror)
 			else:
 				status_text = 'Input not from file, save not available'
-		elif k == ord('p'):
-			status_text = get_progress_bar(page, len(pages), status_win, cols)
+		elif k == ord('p') or k == ord('n'):
+			status_text = get_progress_bar(page, len(pages), status_win, cols, k == ord('p'))
 			status(status_text, status_win)
 			screen.getch()
 			status_text = None
@@ -382,10 +424,15 @@ def main(screen):
 					(pages, index) = ready_text(text, page_width, page_height)
 		elif k == curses.KEY_RESIZE:
 			oldpage = page
-			page_wins, page_n_wins, status_win, page_width, page_height = create_column_layout(screen, cols, 3, 1, 2)
-			(pages, index) = ready_text(text, page_width, page_height)
-			page = find_page_with_word(word, index)
-			page = (page//cols)*cols
+			try:
+				page_wins, page_n_wins, status_win, page_width, page_height = create_column_layout(screen, cols, 3, 1, 2)
+				(pages, index) = ready_text(text, page_width, page_height)
+				page = find_page_with_word(word, index)
+				page = (page//cols)*cols
+				too_small = False
+			except TooSmallError as e:
+				too_small = True
+				too_small_cols = e.cols
 			#t = "%s, %s (%s)"%(y, x, curses.is_term_resized(y,x))
 			(y, x) = screen.getmaxyx()
 			#status_text = "%s -> %s, %s (%s)"%(t, y, x, curses.is_term_resized(y,x))
